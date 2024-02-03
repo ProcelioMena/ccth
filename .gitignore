@@ -1,0 +1,4 @@
+.direnv/*
+.DS_Store
+**/__pycache__/
+service_account.json
