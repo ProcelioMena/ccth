@@ -99,5 +99,5 @@ def get_messages(service, user_id="me"):
 
 
 if __name__ == "__main__":
-    messages = GmailGetter().get_messages(query='after:2024/01/01')
+    messages = GmailGetter().get_snippets()
     print(len(messages))

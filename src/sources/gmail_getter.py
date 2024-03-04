@@ -7,8 +7,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from typing import Optional
 
-from constants import GMAIL_SCOPES
-
+from constants import GMAIL_SCOPES, BANK_EMAILS
 
 class GmailGetter:
     def __init__(self):
@@ -27,11 +26,13 @@ class GmailGetter:
         """
         creds = None
         if exists('token.json'):
+            print('Token exists')
             creds = Credentials.from_authorized_user_file('token.json', GMAIL_SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
+                print('getting new token')
                 flow = InstalledAppFlow.from_client_secrets_file(
                     'credentials.json', GMAIL_SCOPES)
                 creds = flow.run_local_server(port=0)
@@ -39,36 +40,29 @@ class GmailGetter:
                 token.write(creds.to_json())
         return creds
 
-
-    def get_messages(self, query: Optional[str] = None):
+    def get_snippets(self, query: Optional[str] = None):
         """
         Get the messages from the user's Gmail account.
         :param query: The query to filter the messages. For example, 'from:example@email.com'.
         """
-        result = self.service.users().messages().list(userId=self.user_id,  labelIds=["IMPORTANT"], q=query).execute()
-        messages = result.get('messages', [])
-        while 'nextPageToken' in result:
-            page_token = result['nextPageToken']
-            result = self.service.users().messages().list(userId=self.user_id, pageToken=page_token).execute()
-            messages += result.get('messages', [])
-        msg_n = messages[-1]
-        msg = self.service.users().messages().get(userId=self.user_id, id=messages[0]['id']).execute()
-        print(msg.keys())
-        print(msg['payload'].keys())
-        print(msg['payload']['headers'][0])
-        print(msg['snippet'])
-        print(msg['payload']['body'])
-        body = msg['payload']['body']['data']
-        body = body.replace("-", "+").replace("_", "/")
-        body = base64.b64decode(body)
-        print(body)
+        all_snippepts = {}
+        for bank, email in BANK_EMAILS.items():
+            print(f'Processing {bank}...')
+            query = f'from:{email} after:2024/01/01'
+            print(f'Query: {query}')
+            result = self.service.users().messages().list(userId=self.user_id,  labelIds=["IMPORTANT"], q=query).execute()
+            messages = result.get('messages', [])
+            snippets = []
+            while 'nextPageToken' in result:
+                page_token = result['nextPageToken']
+                result = self.service.users().messages().list(userId=self.user_id, pageToken=page_token).execute()
+                messages += result.get('messages', [])
+            print(f'{len(messages)} transactions found')
 
-        date = msg['internalDate']
-        date = datetime.fromtimestamp(int(date) / 1000)
-        print(date)
+            for message in messages:
+                msg = self.service.users().messages().get(userId=self.user_id, id=message['id']).execute()
+                snippets.append(msg['snippet'])
 
-        # Convert the message internal date to a human-readable format
+            all_snippepts[bank] = snippets
 
-
-
-        return messages
+        return all_snippepts
