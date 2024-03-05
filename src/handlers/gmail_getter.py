@@ -40,19 +40,20 @@ class GmailGetter:
                 token.write(creds.to_json())
         return creds
 
-    def get_snippets(self, query: Optional[str] = None):
+    def get_transactions(self, query: Optional[str] = None):
         """
         Get the messages from the user's Gmail account.
         :param query: The query to filter the messages. For example, 'from:example@email.com'.
         """
-        all_snippepts = {}
+        all_transactions = {}
         for bank, email in BANK_EMAILS.items():
+            if bank == 'colpatria':
+                continue
             print(f'Processing {bank}...')
-            query = f'from:{email} after:2024/01/01'
-            print(f'Query: {query}')
+            query = f'from:{email} after:2024/03/01'
             result = self.service.users().messages().list(userId=self.user_id,  labelIds=["IMPORTANT"], q=query).execute()
             messages = result.get('messages', [])
-            snippets = []
+            snippets, bodies = [], []
             while 'nextPageToken' in result:
                 page_token = result['nextPageToken']
                 result = self.service.users().messages().list(userId=self.user_id, pageToken=page_token).execute()
@@ -62,7 +63,12 @@ class GmailGetter:
             for message in messages:
                 msg = self.service.users().messages().get(userId=self.user_id, id=message['id']).execute()
                 snippets.append(msg['snippet'])
+                body = msg['payload']['body']['data']
+                body = body.replace("-", "+").replace("_", "/")
+                body = base64.b64decode(body).decode('utf-8')
+                bodies.append(body)
 
-            all_snippepts[bank] = snippets
 
-        return all_snippepts
+            all_transactions[bank] = [snippets, bodies]
+
+        return all_transactions
