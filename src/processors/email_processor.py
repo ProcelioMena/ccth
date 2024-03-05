@@ -12,9 +12,8 @@ class EmailProcessor:
         :return: A DataFrame with the transaction details.
         """
         txs = []
-        snippets, bodies = transactions[0], transactions[1]
-        for body in bodies:
-            dfs = read_html(StringIO(body))
+        for transaction in transactions:
+            dfs = read_html(StringIO(transaction))
             tx = dfs[-1]
             tx = tx.iloc[1, :]
             if len(tx) == 4: 
@@ -25,7 +24,8 @@ class EmailProcessor:
         df = df.drop(columns=['fecha', 'hora', 'second'])
         df['card'] = 4489
         df['bank'] = 'colpatria'
-        df = df.rename(columns={'comercio': 'place', 'monto': 'amount'})
+        df['type'] = 'buy'
+        df = df.rename(columns={'comercio': 'to', 'monto': 'amount'})
         return df
     
     def process_bancolombia(self, transactions: list) -> DataFrame:
@@ -34,17 +34,58 @@ class EmailProcessor:
         :param transactions: The transactions to be processed.
         :return: A DataFrame with the transaction details.
         """
-        snippets, bodies = transactions[0], transactions[1]
-        print(snippets[0])
-        soup = BeautifulSoup(bodies[0], 'html.parser')
-        print(soup.prettify())
-        element = soup.find(text='Bancolombia le informa Compra por $18.200,00 en DROGUERIA INGLESA 11 19:32. 03/03/2024 T.Cred *6295. Inquietudes al 6045109095/018000931987')
-        if element:
-            print(element)
-            raise Exception(element)
-        else:
-            print('No element found')
+        txs = []
+        i = 0
+        for transaction in transactions:
 
+            soup = BeautifulSoup(transaction, 'html.parser')
+            soup = soup.prettify().splitlines()
+            tx = [line for line in soup if '$' in line][0]
+
+            tx_data = tx.split('$')[1].split('. ')[:-1]
+            first_split, last_ = tx_data[0].split(' '), tx_data[-1]
+            amount = first_split[0].split(',')[0].replace('.', '')
+            if 'compra' in tx.lower():
+                card, date = last_.split('*')[-1], last_.split(' ')[0]
+                hour = first_split[-1]
+                place = ' '.join(first_split[2:-1])
+                txs.append([place, amount, date, hour, card, 'buy'])
+            elif 'Transferencia' in tx:
+                amount = first_split[0].split('.')[0].replace(',', '')
+                datetime_ = last_.split(' ')
+                date, hour = datetime_[0], datetime_[1]
+                to = int(first_split[-1])
+                card = tx_data[0].split('*')[-1].split(' ')[0]
+                txs.append([to, amount, date, hour, card, 'transfer'])
+            elif 'Avance' in tx:
+                tx_data = tx_data[0].split(' ')
+                amount = tx_data[0].split(',')[0].replace('.', '')
+                card = tx_data[-1].split('*')[-1]
+                to = tx_data[2]
+                date, hour = tx_data[-3], tx_data[-4]
+                txs.append([to, amount, date, hour, card, 'cash'])
+            elif 'Recibiras' in tx:
+                print(tx)
+                print(tx_data)
+                amount = int(tx_data[0].split(' ')[0].replace('.', '').split(',')[0])
+                card = tx_data[-1].split('*')[-1].split(' ')[0]
+                datetime = tx_data[-1].split(' ')
+                date, hour = datetime[0], datetime[1]
+                from_ = tx_data[0].split(' ')
+                print(from_, -amount, card, date, hour)
+            else:
+                print('Transaction not supported')
+
+            i += 1
+
+        df = DataFrame(txs, columns=['to', 'amount', 'date', 'hour', 'card', 'type'])
+        df[['day', 'month', 'year']] = df['date'].str.split('/', expand=True).astype(int)
+        df[['hour', 'minute']] = df['hour'].str.split(':', expand=True).astype(int)
+        df['bank'] = 'bancolombia'
+        df = df.drop(columns=['date'])
+        raise Exception(df)
+
+        return df
 
     def process_transactions(self, transactions: dict) -> DataFrame:
         """

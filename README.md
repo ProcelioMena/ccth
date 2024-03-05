@@ -36,7 +36,7 @@
 ## About Project
 
 The objective of this repository is to fetch all the transactions reported to my credit card and put them in my financial
-tracker
+tracker stored in Google Sheets
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
