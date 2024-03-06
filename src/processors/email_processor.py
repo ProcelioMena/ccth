@@ -1,3 +1,4 @@
+import re
 from bs4 import BeautifulSoup
 from io import StringIO
 from pandas import DataFrame, concat, read_html
@@ -41,38 +42,25 @@ class EmailProcessor:
             soup = BeautifulSoup(transaction, 'html.parser')
             soup = soup.prettify().splitlines()
             tx = [line for line in soup if '$' in line][0]
+            print(tx)
+            amount = re.search('([0-9,.]+)', tx).group(1)
+            am1, am2 = amount.split(',')[0].replace('.', ''), amount.split('.')[0].replace(',', '')
+            hour = re.search('([0-9]{2}):([0-9]{2})', tx).group(0)
+            date = re.search('([0-9]{2})/([0-9]{2})/([0-9]{4})', tx).group(0)
+            card = re.search('\*([0-9]+)', tx).group(0)[1:]
 
-            tx_data = tx.split('$')[1].split('. ')[:-1]
-            first_split, last_ = tx_data[0].split(' '), tx_data[-1]
-            amount = first_split[0].split(',')[0].replace('.', '')
             if 'compra' in tx.lower():
-                card, date = last_.split('*')[-1], last_.split(' ')[0]
-                hour = first_split[-1]
-                place = ' '.join(first_split[2:-1])
-                txs.append([place, amount, date, hour, card, 'buy'])
+                to = re.search('?<=en\s)(.*?)(?= 0\d:\d{2})', tx).group(0)
+                print(to)
+                pass
             elif 'Transferencia' in tx:
-                amount = first_split[0].split('.')[0].replace(',', '')
-                datetime_ = last_.split(' ')
-                date, hour = datetime_[0], datetime_[1]
-                to = int(first_split[-1])
-                card = tx_data[0].split('*')[-1].split(' ')[0]
-                txs.append([to, amount, date, hour, card, 'transfer'])
+                pass
             elif 'Avance' in tx:
-                tx_data = tx_data[0].split(' ')
-                amount = tx_data[0].split(',')[0].replace('.', '')
-                card = tx_data[-1].split('*')[-1]
-                to = tx_data[2]
-                date, hour = tx_data[-3], tx_data[-4]
-                txs.append([to, amount, date, hour, card, 'cash'])
+                to = re.search('?<=en\s)(.*?)(?= 0\d:\d{2})', tx).group(0)
+                print(to)
+                pass
             elif 'Recibiras' in tx:
-                print(tx)
-                print(tx_data)
-                amount = int(tx_data[0].split(' ')[0].replace('.', '').split(',')[0])
-                card = tx_data[-1].split('*')[-1].split(' ')[0]
-                datetime = tx_data[-1].split(' ')
-                date, hour = datetime[0], datetime[1]
-                from_ = tx_data[0].split(' ')
-                print(from_, -amount, card, date, hour)
+                pass
             else:
                 print('Transaction not supported')
 
