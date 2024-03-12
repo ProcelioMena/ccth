@@ -47,8 +47,6 @@ class GmailGetter:
         """
         all_transactions = {}
         for bank, email in BANK_EMAILS.items():
-            if bank == 'colpatria':
-                continue
             print(f'Processing {bank}...')
             query = f'from:{email} after:2024/01/01'
             result = self.service.users().messages().list(userId=self.user_id,  labelIds=["IMPORTANT"], q=query).execute()

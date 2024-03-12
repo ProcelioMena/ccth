@@ -42,36 +42,37 @@ class EmailProcessor:
             soup = BeautifulSoup(transaction, 'html.parser')
             soup = soup.prettify().splitlines()
             tx = [line for line in soup if '$' in line][0]
-            print(tx)
             amount = re.search('([0-9,.]+)', tx).group(1)
             am1, am2 = amount.split(',')[0].replace('.', ''), amount.split('.')[0].replace(',', '')
             hour = re.search('([0-9]{2}):([0-9]{2})', tx).group(0)
             date = re.search('([0-9]{2})/([0-9]{2})/([0-9]{4})', tx).group(0)
             card = re.search('\*([0-9]+)', tx).group(0)[1:]
+            tx_data = [date, hour, card]
 
             if 'compra' in tx.lower():
-                to = re.search('?<=en\s)(.*?)(?= 0\d:\d{2})', tx).group(0)
-                print(to)
-                pass
+                to = re.search('(?<=en\s)(.*?)(?=\s\d{2}:\d{2})', tx).group(0)
+                tx_data.extend([to, 'buy', int(am1)])
+                txs.append(tx_data)
             elif 'Transferencia' in tx:
-                pass
+                to = str(int(re.search('(?<=cta\s)(\d+)', tx).group(0)))
+                tx_data.extend([to, 'transfer', int(am1)])
+                txs.append(tx_data)
             elif 'Avance' in tx:
-                to = re.search('?<=en\s)(.*?)(?= 0\d:\d{2})', tx).group(0)
-                print(to)
-                pass
+                to = re.search('(?<=en\s)(.*?)(?=\s\d{2}:\d{2})', tx).group(0)
+                tx_data.extend([to, 'cash', int(am1)])
+                txs.append(tx_data)
             elif 'Recibiras' in tx:
-                pass
+                to = re.search('(?<=por parte de\s)(.*?)(?=\s\s\s)', tx).group(0)
+                tx_data.extend([to, 'refund', int(am1)])
+                txs.append(tx_data)
             else:
                 print('Transaction not supported')
 
-            i += 1
-
-        df = DataFrame(txs, columns=['to', 'amount', 'date', 'hour', 'card', 'type'])
+        df = DataFrame(txs, columns=['date', 'hour', 'card', 'to', 'type', 'amount'])
         df[['day', 'month', 'year']] = df['date'].str.split('/', expand=True).astype(int)
         df[['hour', 'minute']] = df['hour'].str.split(':', expand=True).astype(int)
         df['bank'] = 'bancolombia'
         df = df.drop(columns=['date'])
-        raise Exception(df)
 
         return df
 
